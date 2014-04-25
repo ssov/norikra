@@ -8,9 +8,11 @@ require 'norikra/error'
 require 'norikra/query/ast'
 require 'norikra/field'
 
+require 'base64'
+
 module Norikra
   class Query
-    attr_accessor :name, :group, :expression, :statement_name, :fieldsets
+    attr_accessor :name, :group, :expression, :statement_name, :fieldsets, :hook
 
     def initialize(param={})
       @name = param[:name]
@@ -18,6 +20,7 @@ module Norikra
       @group = param[:group] # default nil
       @expression = param[:expression]
       raise Norikra::ArgumentError, "Query expression MUST NOT be blank" if @expression.nil? || @expression.empty?
+      @hook = Base64.decode64(param[:hook]) unless param[:hook].nil?
 
       @statement_name = nil
       @fieldsets = {} # { target => fieldset }
