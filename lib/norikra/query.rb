@@ -92,7 +92,7 @@ module Norikra
 
       dup_aliases = (alias_map.keys & fields.keys)
       unless dup_aliases.empty?
-        raise Norikra::ClientError, "Invalid alias '#{dup_aliases.join(',')}', same with target name"
+        #raise Norikra::ClientError, "Invalid alias '#{dup_aliases.join(',')}', same with target name"
       end
 
       default_target = fields.keys.size == 1 ? fields.keys.first : nil
