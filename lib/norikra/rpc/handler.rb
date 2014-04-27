@@ -63,9 +63,9 @@ class Norikra::RPC::Handler
     }
   end
 
-  def register(query_name, query_group, expression, hook)
+  def register(query_name, query_group, expression)
     logging(:manage, :register, [query_name, query_group, expression]){
-      r = @engine.register(Norikra::Query.new(:name => query_name, :group => query_group, :expression => expression, :hook => hook))
+      r = @engine.register(Norikra::Query.new(:name => query_name, :group => query_group, :expression => expression))
       !!r
     }
   end
@@ -73,6 +73,20 @@ class Norikra::RPC::Handler
   def deregister(query_name)
     logging(:manage, :deregister, [query_name]){
       r = @engine.deregister(query_name)
+      !!r
+    }
+  end
+
+  def add_hook(query_name, hook)
+    logging(:manage, :add_hook, [query_name]) {
+      r = @engine.add_hook(query_name, hook)
+      !!r
+    }
+  end
+
+  def remove_hook(query_name)
+    logging(:manage, :remove_hook, [query_name]) {
+      r = @engine.remove_hook(query_name)
       !!r
     }
   end

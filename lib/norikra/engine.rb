@@ -13,6 +13,8 @@ require 'esper/lib/cglib-nodep-2.2.jar'
 
 require 'norikra/typedef_manager'
 
+require 'base64'
+
 module Norikra
   class Engine
     attr_reader :targets, :queries, :output_pool, :typedef_manager
@@ -183,6 +185,22 @@ module Norikra
       deregister_query(queries.first)
     end
 
+    def add_hook(query_name, hook)
+      info "add-hook", :name => query_name
+      queries = @queries.select{|q| q.name == query_name }
+      return nil unless queries.size == 1 # just ignore for 'not found'
+
+      add_hook_to_query(queries.first, hook)
+    end
+
+    def remove_hook(query_name)
+      info "remove-hook", :name => query_name
+      queries = @queries.select{|q| q.name == query_name }
+      return nil unless queries.size == 1 # just ignore for 'not found'
+
+      remove_hook_from_query(queries.first)
+    end
+
     def send(target_name, events)
       trace "send messages", :target => target_name, :events => events
 
@@ -242,12 +260,12 @@ module Norikra
     class Listener
       include com.espertech.esper.client.UpdateListener
 
-      def initialize(query_name, query_group, output_pool, events_statistics, hook)
-        @query_name = query_name
-        @query_group = query_group
+      def initialize(query, output_pool, events_statistics)
+        @query = query
+        @query_name = @query.name
+        @query_group = @query.group
         @output_pool = output_pool
         @events_statistics = events_statistics
-        @hook = hook
       end
 
       def type_convert(event)
@@ -271,12 +289,13 @@ module Norikra
         t = Time.now.to_i
         events = new_events.map{|e| [t, type_convert(e)]}
         trace "updated event", :query => @query_name, :group => @query_group, :event => events
-        if @hook.nil?
+
+        if @query.hook.nil?
           @output_pool.push(@query_name, @query_group, events)
           @events_statistics[:output] += events.size
         else
           begin
-            eval(@hook).(events)
+            eval(@query.hook).(events)
           rescue => e
             info "hook error", error: e
           end
@@ -395,6 +414,22 @@ module Norikra
       true
     end
 
+    def add_hook_to_query(query, hook)
+      @mutex.synchronize do
+        return nil unless @queries.include?(query)
+        query.hook = Base64.decode64(hook)
+      end
+      true
+    end
+
+    def remove_hook_from_query(query)
+      @mutex.synchronize do
+        return nil unless @queries.include?(query)
+        query.hook = nil
+      end
+      true
+    end
+
     def register_waiting_queries
       ready = []
       not_ready = []
@@ -456,7 +491,7 @@ module Norikra
       Norikra::Query.rewrite_query(statement_model, event_type_name_map)
 
       epl = administrator.create(statement_model)
-      epl.java_send :addListener, [com.espertech.esper.client.UpdateListener.java_class], Listener.new(query.name, query.group, @output_pool, @statistics[:events], query.hook)
+      epl.java_send :addListener, [com.espertech.esper.client.UpdateListener.java_class], Listener.new(query, @output_pool, @statistics[:events])
       query.statement_name = epl.getName
       # epl is automatically started.
       # epl.isStarted #=> true
